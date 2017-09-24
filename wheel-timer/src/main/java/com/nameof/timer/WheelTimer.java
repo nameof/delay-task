@@ -1,7 +1,6 @@
 package com.nameof.timer;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
 
 
 public class WheelTimer {
@@ -9,82 +8,65 @@ public class WheelTimer {
 	
 	private Solt[] wheel = new Solt[QUEUE_SIZE];
 	
-	private final int mask = wheel.length - 1;
-	
 	private ConcurrentLinkedQueue<Task> tasks = new ConcurrentLinkedQueue<>();
 	
-	private long duration =  100;
+	private long duration =  500;
 	
 	private Thread workerThread = new Thread(new Worker());
 	
-	private volatile long startTime;
+	public WheelTimer() {
+		init();
+	}
+	
+	private void init() {
+		for (int i = 0; i < wheel.length; i++) {
+			wheel[i] = new Solt();
+		}
+	}
 	
 	public void addTask(int delay, Runnable job) {
-		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(delay) - startTime;
-		tasks.add(new Task(job, deadline));
+		tasks.add(new Task(job, delay));
 	}
 	
 	public void start() {
-		startTime = System.nanoTime();
-        if (startTime == 0) {
-            startTime = 1;
-        }
 		workerThread.start();
-	}
-	
-	private void initSolt(int position) {
-		if (wheel[position] == null) {
-			synchronized (wheel) {
-				if (wheel[position] == null) {
-					wheel[position] = new Solt();
-				}
-			}
-		}
 	}
 	
 	private final class Worker implements Runnable {
 
-		private int current = 0;
+		private long current = 0;
+		
+		private Executor executor = new Executor();
 		
 		@Override
 		public void run() {
 
+			executor.start();
+			
 			while (true) {
 				
-				final long deadline = waitForNextTick();
-                if (deadline > 0) {
-                    transferTasks();
-                    
-                    current = (current & mask);
-                    
-                    if (wheel[current] != null)
-                    	wheel[current].executeTask(deadline);
-                    
-                    current++;
+                transferTasks();
+                
+                int idx = (int) (current % wheel.length);
+                Solt solt = wheel[idx];
+                if (solt != null) {
+                	solt.executeTask(executor);
                 }
-				
-				
+                
+                waitForNextStep();
+                
+                current++;
 			}
 		}
 		
-		 private long waitForNextTick() {
-	            long deadline = duration * (current + 1);
+		private void waitForNextStep() {
+			try {
+				Thread.sleep(duration);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 
-	            for (;;) {
-	                final long currentTime = System.nanoTime() - startTime;
-	                long sleepTimeMs = (deadline - currentTime + 999999) / 1000000;
-
-	                if (sleepTimeMs <= 0) {
-	                    if (currentTime == Long.MIN_VALUE) {
-	                        return -Long.MAX_VALUE;
-	                    } else {
-	                        return currentTime;
-	                    }
-	                }
-
-	            }
-	        }
-		
 		private void transferTasks() {
 			for (int i = 0; i < 1000; i++) {
                 Task task = tasks.poll();
@@ -93,13 +75,10 @@ public class WheelTimer {
                     break;
                 }
 
-                long calculated = task.getDeadline() / duration;
-                task.setRound((int) ((calculated - current) / wheel.length));
-
-                final long ticks = Math.max(calculated, current); // Ensure we don't schedule for past.
-                int stopIndex = (int) (ticks & mask);
+                int stopIndex = (int) ((current + task.getDelay() * 1000 / duration) % wheel.length);
+                int round = (int) (task.getDelay() * 1000 / duration / wheel.length);
+                task.setRound(round);
                 
-				initSolt(stopIndex);
                 wheel[stopIndex].addTask(task);
             }
 		}

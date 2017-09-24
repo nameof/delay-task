@@ -11,7 +11,7 @@ public class Client {
 		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		for (int i = 0; i < 2; i++) {
 			System.out.println(s.format(new Date()) + "提交任务！" );
-			w.addTask(6, new Runnable() {
+			w.addTask(64, new Runnable() {
 				
 				@Override
 				public void run() {

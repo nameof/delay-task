@@ -6,11 +6,11 @@ public class Task {
 	
 	private Runnable job;
 	
-	private long deadline;
+	private long delay;
 	
-	public Task(Runnable job, long deadline) {
+	public Task(Runnable job, long delay) {
 		this.job = job;
-		this.deadline = deadline;
+		this.delay = delay;
 	}
 	
 	public void run() {
@@ -18,7 +18,7 @@ public class Task {
 	}
 
 	public int round() {
-		return --round;
+		return round--;
 	}
 	
 	public int getRound() {
@@ -33,7 +33,7 @@ public class Task {
 		this.job = job;
 	}
 
-	public long getDeadline() {
-		return deadline;
+	public long getDelay() {
+		return delay;
 	}
 }

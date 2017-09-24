@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Solt {
 	private ConcurrentLinkedQueue<Task> tasks = new ConcurrentLinkedQueue<>();
-
+	
 	public ConcurrentLinkedQueue<Task> getTasks() {
 		return tasks;
 	}
@@ -14,13 +14,14 @@ public class Solt {
 		tasks.add(task);
 	}
 	
-	public void executeTask(long deadline) {
+	public void executeTask(Executor executor) {
 		Iterator<Task> iterator = tasks.iterator();
 		while (iterator.hasNext()) {
 			Task task = iterator.next();
-			if (task.round() <= 0 && task.getDeadline() < deadline) {
+			if (task.round() <= 0) {
 				iterator.remove();
-				task.run();
+				//task.run();
+				executor.execute(task);
 			}
 		}
 	}
