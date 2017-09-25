@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import com.nameof.jedis.JedisUtil;
 
@@ -15,16 +16,43 @@ public class RedisTimer {
 	
 	private byte[] queueName = "delay_task_queue".getBytes();
 	
-	private Thread workThread = new Thread(new Worker());
+	/** 任务状态 */
+	public static final int WORKER_STATE_INIT = 0;
+	public static final int WORKER_STATE_STARTED = 1;
+	public static final int WORKER_STATE_SHUTDOWN = 2;
+	
+	@SuppressWarnings({ "unused" })
+	private volatile int workerState = WORKER_STATE_INIT; // 0 - init, 1 - started, 2 - shut down
+	
+	private static final AtomicIntegerFieldUpdater<RedisTimer> WORKER_STATE_UPDATER =
+	        AtomicIntegerFieldUpdater.newUpdater(RedisTimer.class, "workerState");
+	
+	private Thread workerThread = new Thread(new Worker());
 	
 	public void addTask(Task job, int delay, TimeUnit unit) {
-		//start();
+		start();
 		long score = System.currentTimeMillis() + unit.toMillis(delay);
 		JedisUtil.getJedis().zadd(queueName, score, serialize(job));
 	}
 	
-	public void start() {
-		workThread.start();
+	private void start() {
+		 switch (WORKER_STATE_UPDATER.get(this)) {
+	         case WORKER_STATE_INIT:
+	             if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_INIT, WORKER_STATE_STARTED)) {
+	                 workerThread.start();
+	             }
+	             break;
+	         case WORKER_STATE_STARTED:
+	             break;
+	         case WORKER_STATE_SHUTDOWN:
+	             throw new IllegalStateException("cannot be started once stopped");
+	         default:
+	             throw new Error("Invalid WorkerState");
+		 }
+	}
+	
+	public void stop() {
+		WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN);
 	}
 
 	private static byte [] serialize(Object obj) {
@@ -66,8 +94,14 @@ public class RedisTimer {
 
     private class Worker implements Runnable {
 
+    	private Executor executor = new Executor();
+    	
+    	@Override
 		public void run() {
-			while (true) {
+
+			executor.start();
+			
+			while (WORKER_STATE_UPDATER.get(RedisTimer.this) == WORKER_STATE_STARTED) {
 				double current = System.currentTimeMillis();
 				Set<byte[]> set = JedisUtil.getJedis().zrangeByScore(queueName, 0, current);
 				List<Task> list = new ArrayList<>(set.size());
@@ -77,20 +111,40 @@ public class RedisTimer {
 					}
 					
 					for (Task t : list) {
-						t.run();
+						if (t != null)
+							executor.execute(t);
 					}
 					
 					JedisUtil.getJedis().zremrangeByScore(queueName, 0, current);
 				}
+				
 				try {
 					TimeUnit.MILLISECONDS.sleep(100);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
-				} finally {
-					JedisUtil.returnResource();
 				}
 			}
+			
+			JedisUtil.returnResource();
+			
+			terminateExecutor();
 		}
     	
+		private void terminateExecutor() {
+
+			boolean interrupted = false;
+            while (executor.isAlive()) {
+            	executor.interrupt();
+                try {
+                	executor.join(100);
+                } catch (InterruptedException ignored) {
+                    interrupted = true;
+                }
+            }
+
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+		}
     }
 }

@@ -5,9 +5,8 @@ import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 public class Client {
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 		RedisTimer rt = new RedisTimer();
-		rt.start();
 		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		for (int i = 0; i < 2; i++) {
 			System.out.println(s.format(new Date()) + "提交任务！" );
@@ -19,5 +18,9 @@ public class Client {
 				}
 			}, 10, TimeUnit.SECONDS);
 		}
+		
+		TimeUnit.SECONDS.sleep(12);
+		
+		rt.stop();
 	}
 }
