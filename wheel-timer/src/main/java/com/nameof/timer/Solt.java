@@ -4,6 +4,8 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Solt {
+	
+	/** 任务链 */
 	private ConcurrentLinkedQueue<Task> tasks = new ConcurrentLinkedQueue<>();
 	
 	public ConcurrentLinkedQueue<Task> getTasks() {
@@ -21,7 +23,7 @@ public class Solt {
 			if (task.round() <= 0) {
 				iterator.remove();
 				//task.run();
-				executor.execute(task);
+				executor.execute(task);//避免耗时操作，使用额外的执行线程执行
 			}
 		}
 	}

@@ -7,11 +7,10 @@ public class Client {
 
 	public static void main(String[] args) {
 		WheelTimer w = new WheelTimer();
-		w.start();
 		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		for (int i = 0; i < 2; i++) {
 			System.out.println(s.format(new Date()) + "提交任务！" );
-			w.addTask(64, new Runnable() {
+			w.addTask(128, new Runnable() {
 				
 				@Override
 				public void run() {
