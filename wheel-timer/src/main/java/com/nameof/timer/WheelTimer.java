@@ -3,8 +3,13 @@ package com.nameof.timer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
-
-public class WheelTimer {
+/**
+ * 对于新添加的任务{@link WheelTimer}首先将其缓存到自身的{@link #tasks}中
+ * {@link #workerThread}会在下一次的指针移动时，将缓存的任务放置到对应的时间轮槽中
+ * 所以，时间轮任务执行时间的精度会受到指针移动的时间间隔影响
+ * @author Chengpan
+ */
+public class WheelTimer {//TODO 提高延时精度
 	/** 轮子大小 */
 	public static final int QUEUE_SIZE = 64;
 	
@@ -18,14 +23,16 @@ public class WheelTimer {
 	
 	private Thread workerThread = new Thread(new Worker());
 	
+	/** 任务状态 */
 	public static final int WORKER_STATE_INIT = 0;
-    public static final int WORKER_STATE_STARTED = 1;
-    public static final int WORKER_STATE_SHUTDOWN = 2;
-    @SuppressWarnings({ "unused" })
-    private volatile int workerState = WORKER_STATE_INIT; // 0 - init, 1 - started, 2 - shut down
-    
-    private static final AtomicIntegerFieldUpdater<WheelTimer> WORKER_STATE_UPDATER =
-            AtomicIntegerFieldUpdater.newUpdater(WheelTimer.class, "workerState");
+	public static final int WORKER_STATE_STARTED = 1;
+	public static final int WORKER_STATE_SHUTDOWN = 2;
+	
+	@SuppressWarnings({ "unused" })
+	private volatile int workerState = WORKER_STATE_INIT; // 0 - init, 1 - started, 2 - shut down
+	
+	private static final AtomicIntegerFieldUpdater<WheelTimer> WORKER_STATE_UPDATER =
+	        AtomicIntegerFieldUpdater.newUpdater(WheelTimer.class, "workerState");
 	
 	public WheelTimer() {
 		init();
@@ -58,6 +65,10 @@ public class WheelTimer {
 		 }
 	}
 	
+	public void stop() {
+		WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN);
+	}
+	
 	/** 时间轮执行器，轮询时间轮和任务，调度执行 */
 	private final class Worker implements Runnable {
 
@@ -70,7 +81,7 @@ public class WheelTimer {
 
 			executor.start();
 			
-			while (true) {
+			while (WORKER_STATE_UPDATER.get(WheelTimer.this) == WORKER_STATE_STARTED) {
 				
                 transferTasks();
                 
@@ -84,6 +95,8 @@ public class WheelTimer {
                 
                 current++;
 			}
+			
+			terminateExecutor();
 		}
 		
 		private void waitForNextStep() {
@@ -114,5 +127,21 @@ public class WheelTimer {
             }
 		}
 		
+		private void terminateExecutor() {
+
+			boolean interrupted = false;
+            while (executor.isAlive()) {
+            	executor.interrupt();
+                try {
+                	executor.join(100);
+                } catch (InterruptedException ignored) {
+                    interrupted = true;
+                }
+            }
+
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+		}
 	}
 }

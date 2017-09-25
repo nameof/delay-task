@@ -22,7 +22,7 @@ public class Executor extends Thread{
 			try {
 				queue.take().run();
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				return;
 			}
 		}
 	}
