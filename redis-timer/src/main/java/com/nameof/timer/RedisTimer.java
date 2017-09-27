@@ -99,6 +99,7 @@ public class RedisTimer {
     	@Override
 		public void run() {
 
+    		boolean interrupted = false;
 			executor.start();
 			
 			while (WORKER_STATE_UPDATER.get(RedisTimer.this) == WORKER_STATE_STARTED) {
@@ -111,8 +112,7 @@ public class RedisTimer {
 					}
 					
 					for (Task t : list) {
-						if (t != null)
-							executor.execute(t);
+						executor.execute(t);
 					}
 					
 					JedisUtil.getJedis().zremrangeByScore(queueName, 0, current);
@@ -121,17 +121,20 @@ public class RedisTimer {
 				try {
 					TimeUnit.MILLISECONDS.sleep(100);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					interrupted = true;
 				}
 			}
 			
 			JedisUtil.returnResource();
 			
-			terminateExecutor();
+			interrupted = terminateExecutor() || interrupted;
+			
+			if (interrupted) {
+				Thread.currentThread().interrupt();
+			}
 		}
     	
-		private void terminateExecutor() {
-
+		private boolean terminateExecutor() {
 			boolean interrupted = false;
             while (executor.isAlive()) {
             	executor.interrupt();
@@ -141,10 +144,7 @@ public class RedisTimer {
                     interrupted = true;
                 }
             }
-
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
+            return interrupted;
 		}
     }
 }

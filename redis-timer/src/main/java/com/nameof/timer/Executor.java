@@ -18,7 +18,7 @@ public class Executor extends Thread{
 	
 	@Override
 	public void run() {
-		while (true) {
+		while (!isInterrupted()) {
 			try {
 				queue.take().run();
 			} catch (InterruptedException e) {
