@@ -1,5 +1,7 @@
 package com.nameof.timer;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -7,6 +9,16 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class Executor extends Thread{
 	
 	private BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
+
+	private Collection<Task> unProcessedTasks = new HashSet<>();
+	
+	public Collection<Task> getUnProcessedTasks() {
+		return unProcessedTasks;
+	}
+
+	public void setUnProcessedTasks(Collection<Task> unProcessedTasks) {
+		this.unProcessedTasks = unProcessedTasks;
+	}
 
 	public void execute(Task task) {
 		try {
@@ -18,12 +30,20 @@ public class Executor extends Thread{
 	
 	@Override
 	public void run() {
-		while (true) {
+		boolean interrupted = false;
+		while (!isInterrupted()) {
 			try {
 				queue.take().run();
 			} catch (InterruptedException e) {
-				return;
+				interrupted = true;
+				break;
 			}
+		}
+		
+		unProcessedTasks.addAll(queue);
+		
+		if (interrupted) {
+			Thread.currentThread().interrupt();
 		}
 	}
 }

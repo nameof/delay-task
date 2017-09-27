@@ -1,6 +1,8 @@
 package com.nameof.timer;
 
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
@@ -21,6 +23,7 @@ public class WheelTimer {//TODO 提高延时精度
 	/** step频率，毫秒 */
 	private long duration = 900;
 	
+	/** 工作线程，把{@link #tasks}中的Task入槽，并调度执行Task */
 	private Thread workerThread = new Thread(new Worker());
 	
 	/** 任务状态 */
@@ -44,11 +47,12 @@ public class WheelTimer {//TODO 提高延时精度
 		}
 	}
 	
-	public void addTask(int delay, Runnable job) {
+	public void addTask(Runnable job, long delay, TimeUnit unit) {
 		start();
-		tasks.add(new Task(job, delay));
+		tasks.add(new Task(job, unit.toSeconds(delay)));
 	}
 	
+	/** 开启时间轮 */
 	private void start() {
 		 switch (WORKER_STATE_UPDATER.get(this)) {
 	         case WORKER_STATE_INIT:
@@ -65,10 +69,27 @@ public class WheelTimer {//TODO 提高延时精度
 		 }
 	}
 	
-	public void stop() {
+	/**
+	 * 停止时间轮，返回尚未执行的Task
+	 * @return
+	 */
+	public Queue<Task> stop() {
 		WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN);
+		waitForWorkerTerminate();
+		return tasks;
 	}
 	
+	/** 等待工作线程结束，以便完成未执行Task的转移 */
+	private void waitForWorkerTerminate() {
+		
+        while (workerThread.isAlive()) {
+        	workerThread.interrupt();
+            try {
+            	workerThread.join(100);
+            } catch (InterruptedException ignored) {}
+        }
+	}
+
 	/** 时间轮执行器，轮询时间轮和任务，调度执行 */
 	private final class Worker implements Runnable {
 
@@ -103,7 +124,7 @@ public class WheelTimer {//TODO 提高延时精度
 			try {
 				Thread.sleep(duration);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				return;
 			}
 		}
 
@@ -127,6 +148,7 @@ public class WheelTimer {//TODO 提高延时精度
             }
 		}
 		
+		/** 终止任务的执行，并收集未执行的Task，返回到{@link WheelTimer#tasks}中 */
 		private void terminateExecutor() {
 
 			boolean interrupted = false;
@@ -139,9 +161,21 @@ public class WheelTimer {//TODO 提高延时精度
                 }
             }
 
+            collectUnprocessedTasks();
+            
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
+		}
+		
+		/** 收集时间轮各个槽、Executor线程尚未执行Task */
+		private void collectUnprocessedTasks() {
+			
+			tasks.addAll(executor.getUnProcessedTasks());
+			
+			for (Solt solt : wheel) {
+				tasks.addAll(solt.getUnprocessedTaks());
+			}
 		}
 	}
 }
