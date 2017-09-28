@@ -5,6 +5,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -15,6 +18,8 @@ import com.nameof.jedis.JedisUtil;
 public class RedisTimer {
 	
 	private byte[] queueName = "delay_task_queue".getBytes();
+	
+	private Set<Task> unprocessedTasks = new HashSet<>();
 	
 	/** 任务状态 */
 	public static final int WORKER_STATE_INIT = 0;
@@ -51,8 +56,24 @@ public class RedisTimer {
 		 }
 	}
 	
-	public void stop() {
-		WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN);
+	/** 停止时间轮，并返回*本地*尚未被执行的任务，不包含redis中剩余的任务 */
+	public Collection<Task> stop() {
+		if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {
+			waitForWorkerTerminate();
+			return unprocessedTasks;
+		}
+		return Collections.emptySet();
+	}
+	
+	/** 等待工作线程结束，以便完成未执行Task的转移 */
+	private void waitForWorkerTerminate() {
+		
+        while (workerThread.isAlive()) {
+        	workerThread.interrupt();
+            try {
+            	workerThread.join(100);
+            } catch (InterruptedException ignored) {}
+        }
 	}
 
 	private static byte [] serialize(Object obj) {
@@ -128,6 +149,8 @@ public class RedisTimer {
 			JedisUtil.returnResource();
 			
 			interrupted = terminateExecutor() || interrupted;
+			
+			unprocessedTasks.addAll(executor.getUnprocessedTasks());
 			
 			if (interrupted) {
 				Thread.currentThread().interrupt();
