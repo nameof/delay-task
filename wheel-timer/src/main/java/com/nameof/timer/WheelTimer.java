@@ -2,7 +2,6 @@ package com.nameof.timer;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
@@ -10,10 +9,10 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 /**
  * 对于新添加的任务{@link WheelTimer}首先将其缓存到自身的{@link #tasks}中
  * {@link #workerThread}会在下一次的指针移动时，将缓存的任务放置到对应的时间轮槽中
- * 所以，时间轮任务执行时间的精度会受到指针移动的时间间隔影响
+ * 所以，时间轮任务执行时间的精度会受到指针移动的时间间隔影响，并且适用于延时精度不高的场景，例如秒级别的延时
  * @author Chengpan
  */
-public class WheelTimer {//TODO 提高延时精度
+public class WheelTimer {
 	/** 轮子大小 */
 	public static final int QUEUE_SIZE = 64;
 	
@@ -23,7 +22,7 @@ public class WheelTimer {//TODO 提高延时精度
 	private ConcurrentLinkedQueue<Task> tasks = new ConcurrentLinkedQueue<>();
 	
 	/** step频率，毫秒 */
-	private long duration = 900;
+	private long duration = 100;
 	
 	/** 工作线程，把{@link #tasks}中的Task入槽，并调度执行Task */
 	private Thread workerThread = new Thread(new Worker());
@@ -51,7 +50,7 @@ public class WheelTimer {//TODO 提高延时精度
 	
 	public void addTask(Runnable job, long delay, TimeUnit unit) {
 		start();
-		tasks.add(new Task(job, unit.toSeconds(delay)));
+		tasks.add(new Task(job, unit.toMillis(delay)));
 	}
 	
 	/** 开启时间轮 */
@@ -144,8 +143,8 @@ public class WheelTimer {//TODO 提高延时精度
                     break;
                 }
 
-                int stopIndex = (int) ((current + task.getDelay() * 1000 / duration) % wheel.length);
-                int round = (int) (task.getDelay() * 1000 / duration / wheel.length);
+                int stopIndex = (int) ((current + task.getDelay() / duration) % wheel.length);
+                int round = (int) (task.getDelay() / duration / wheel.length);
                 task.setRound(round);
                 
                 wheel[stopIndex].addTask(task);

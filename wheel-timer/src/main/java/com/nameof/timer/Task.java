@@ -6,6 +6,7 @@ public class Task {
 	
 	private Runnable job;
 	
+	/** 以毫秒计数的任务时延数 */
 	private long delay;
 	
 	public Task(Runnable job, long delay) {
