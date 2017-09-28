@@ -1,5 +1,7 @@
 package com.nameof.timer;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
@@ -73,10 +75,12 @@ public class WheelTimer {//TODO 提高延时精度
 	 * 停止时间轮，返回尚未执行的Task
 	 * @return
 	 */
-	public Queue<Task> stop() {
-		WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN);
-		waitForWorkerTerminate();
-		return tasks;
+	public Collection<Task> stop() {
+		if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {
+			waitForWorkerTerminate();
+			return tasks;
+		}
+		return Collections.emptyList();
 	}
 	
 	/** 等待工作线程结束，以便完成未执行Task的转移 */
