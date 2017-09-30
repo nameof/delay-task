@@ -50,6 +50,11 @@ public final class JedisUtil {
         	throw new IllegalStateException("failed to get JedisResource from pool",e); 
         }
     }
+    
+    /** 直接返回一个Jedis资源 */
+    public static Jedis getNonThreadJedis() {
+    	return jedisPool.getResource();
+    }
 
     public static void returnResource() {
     	Jedis jedis = threadLocal.get();
