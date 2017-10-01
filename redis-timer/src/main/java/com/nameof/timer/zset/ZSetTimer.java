@@ -1,4 +1,4 @@
-package com.nameof.timer;
+package com.nameof.timer.zset;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -16,8 +16,10 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import redis.clients.jedis.Jedis;
 
 import com.nameof.jedis.JedisUtil;
+import com.nameof.timer.Executor;
+import com.nameof.timer.Task;
 
-public class RedisTimer {
+public class ZSetTimer {
 	
 	private byte[] queueName = "delay_task_queue".getBytes();
 	
@@ -33,8 +35,8 @@ public class RedisTimer {
 	@SuppressWarnings({ "unused" })
 	private volatile int workerState = WORKER_STATE_INIT; // 0 - init, 1 - started, 2 - shut down
 	
-	private static final AtomicIntegerFieldUpdater<RedisTimer> WORKER_STATE_UPDATER =
-	        AtomicIntegerFieldUpdater.newUpdater(RedisTimer.class, "workerState");
+	private static final AtomicIntegerFieldUpdater<ZSetTimer> WORKER_STATE_UPDATER =
+	        AtomicIntegerFieldUpdater.newUpdater(ZSetTimer.class, "workerState");
 	
 	private Thread workerThread = new Thread(new Worker());
 	
@@ -129,7 +131,7 @@ public class RedisTimer {
     		boolean interrupted = false;
 			executor.start();
 			
-			while (WORKER_STATE_UPDATER.get(RedisTimer.this) == WORKER_STATE_STARTED) {
+			while (WORKER_STATE_UPDATER.get(ZSetTimer.this) == WORKER_STATE_STARTED) {
 				double current = System.currentTimeMillis();
 				Set<byte[]> set = JedisUtil.getJedis().zrangeByScore(queueName, 0, current);
 				if (set != null) {
