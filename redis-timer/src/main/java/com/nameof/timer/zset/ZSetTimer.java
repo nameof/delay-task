@@ -6,20 +6,19 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import redis.clients.jedis.Jedis;
 
 import com.nameof.jedis.JedisUtil;
+import com.nameof.timer.AbstractTimer;
 import com.nameof.timer.Executor;
 import com.nameof.timer.Task;
 
-public class ZSetTimer {
+public class ZSetTimer extends AbstractTimer {
 	
 	private byte[] queueName = "delay_task_queue".getBytes();
 	
@@ -27,50 +26,24 @@ public class ZSetTimer {
 	
 	private Set<Task> unprocessedTasks = new HashSet<>();
 	
-	/** 任务状态 */
-	public static final int WORKER_STATE_INIT = 0;
-	public static final int WORKER_STATE_STARTED = 1;
-	public static final int WORKER_STATE_SHUTDOWN = 2;
-	
-	@SuppressWarnings({ "unused" })
-	private volatile int workerState = WORKER_STATE_INIT; // 0 - init, 1 - started, 2 - shut down
-	
-	private static final AtomicIntegerFieldUpdater<ZSetTimer> WORKER_STATE_UPDATER =
-	        AtomicIntegerFieldUpdater.newUpdater(ZSetTimer.class, "workerState");
-	
 	private Thread workerThread = new Thread(new Worker());
 	
-	public void addTask(Task job, int delay, TimeUnit unit) {
-		start();
+	public void doAddTask(Task job, int delay, TimeUnit unit) {
 		long score = System.currentTimeMillis() + unit.toMillis(delay);
+		job.setDeadline(score);
 		jedis.zadd(queueName, score, serialize(job));
 	}
 	
-	private void start() {
-		 switch (WORKER_STATE_UPDATER.get(this)) {
-	         case WORKER_STATE_INIT:
-	             if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_INIT, WORKER_STATE_STARTED)) {
-	                 workerThread.start();
-	                 jedis = JedisUtil.getNonThreadJedis();
-	             }
-	             break;
-	         case WORKER_STATE_STARTED:
-	             break;
-	         case WORKER_STATE_SHUTDOWN:
-	             throw new IllegalStateException("cannot be started once stopped");
-	         default:
-	             throw new Error("Invalid WorkerState");
-		 }
+	protected void onStart() {
+         workerThread.start();
+         jedis = JedisUtil.getNonThreadJedis();
 	}
 	
 	/** 停止时间轮，并返回*本地*尚未被执行的任务，不包含redis中剩余的任务 */
-	public Collection<Task> stop() {
-		if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {
-			jedis.close();//释放资源
-			waitForWorkerTerminate();
-			return unprocessedTasks;
-		}
-		return Collections.emptySet();
+	public Collection<Task> onStop() {
+		jedis.close();//释放资源
+		waitForWorkerTerminate();
+		return unprocessedTasks;
 	}
 	
 	/** 等待工作线程结束，以便完成未执行Task的转移 */

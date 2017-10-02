@@ -7,9 +7,9 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 import com.nameof.jedis.JedisUtil;
+import com.nameof.timer.Task;
 import com.nameof.timer.expire.ExpireTimer;
 import com.nameof.timer.expire.RedisMsgPubSubListener;
-import com.nameof.timer.expire.UniqueTask;
 
 public class ExpireTimerTest {
 	@Test
@@ -19,8 +19,7 @@ public class ExpireTimerTest {
 		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		System.out.println(s.format(new Date()) + "提交了！");
 		for (int i = 0; i < 3; i++) {
-			final int id = i;
-			timer.addTask(new UniqueTask("" + id) {
+			timer.addTask(new Task() {
 				
 				@Override
 				public void run() {
@@ -29,7 +28,7 @@ public class ExpireTimerTest {
 			}, 5, TimeUnit.SECONDS);
 		}
 		
-		timer.addTask(new UniqueTask("5") {
+		timer.addTask(new Task() {
 			
 			@Override
 			public void run() {
