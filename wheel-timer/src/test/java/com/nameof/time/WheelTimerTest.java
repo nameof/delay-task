@@ -10,11 +10,31 @@ import org.junit.Test;
 import com.nameof.timer.WheelTimer;
 
 public class WheelTimerTest {
+	
+	private static final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
+	
+	@Test
+	public void testArgs() {
+		WheelTimer w = new WheelTimer();
+		w.addTask(new Runnable() {
+			
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {}
+				System.out.println(s.format(new Date()) + "执行了！");
+			}
+		}, -1, TimeUnit.SECONDS);
+		try {
+			Thread.sleep(500);
+		} catch (InterruptedException e) {}
+	}
 
 	@Test
 	public void testStop() {
 		WheelTimer w = new WheelTimer();
-		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
+		
 		for (int i = 0; i < 20; i++) {
 			System.out.println(s.format(new Date()) + "提交任务！" );
 			w.addTask(new Runnable() {
@@ -37,7 +57,6 @@ public class WheelTimerTest {
 	@Test
 	public void testTimer() {
 		WheelTimer w = new WheelTimer();
-		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		for (int i = 0; i < 3; i++) {
 			System.out.println(s.format(new Date()) + "提交任务！" );
 			w.addTask(new Runnable() {
@@ -59,7 +78,6 @@ public class WheelTimerTest {
 	@Test
 	public void testMillSecTimer() {
 		WheelTimer w = new WheelTimer();
-		final SimpleDateFormat s = new SimpleDateFormat("hh:mm:ss:SSS");
 		Random r = new Random(System.currentTimeMillis());
 		for (int i = 0; i < 3; i++) {
 			final int delay = r.nextInt(1000) + 100;

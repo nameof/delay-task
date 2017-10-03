@@ -3,6 +3,7 @@ package com.nameof.timer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
@@ -38,6 +39,16 @@ public class WheelTimer {
 	private static final AtomicIntegerFieldUpdater<WheelTimer> WORKER_STATE_UPDATER =
 	        AtomicIntegerFieldUpdater.newUpdater(WheelTimer.class, "workerState");
 	
+	/**
+	 *  用于{@link #start()}方法等待工作线程初始化完成，方可完成任务的添加
+	 *  否则可能造成并发开启时间轮和添加任务时，工作线程尚未进入执行轮询时间轮，导致那一时刻并发添加的任务延时不准确
+	 *  但在一般情况下，工作线程初始化不存在耗时操作，基本瞬间完成，可以认为此处是臃肿的设计
+	 */
+	private CountDownLatch started = new CountDownLatch(1);
+	
+	/** 工作线程是否已开启 */
+	private volatile boolean workerStarted = false;
+	
 	public WheelTimer() {
 		init();
 	}
@@ -49,6 +60,9 @@ public class WheelTimer {
 	}
 	
 	public void addTask(Runnable job, long delay, TimeUnit unit) {
+		if (delay < 0) {
+			throw new IllegalArgumentException("delay must be >= 0");
+		}
 		start();
 		tasks.add(new Task(job, unit.toMillis(delay)));
 	}
@@ -67,6 +81,12 @@ public class WheelTimer {
 	             throw new IllegalStateException("cannot be started once stopped");
 	         default:
 	             throw new Error("Invalid WorkerState");
+		 }
+		//等待时间轮初始化完成
+		 while (!workerStarted) {
+			 try {
+				started.await();
+			} catch (InterruptedException e) { }
 		 }
 	}
 	
@@ -104,6 +124,10 @@ public class WheelTimer {
 		public void run() {
 
 			executor.start();
+			
+			WheelTimer.this.workerStarted = true;
+			
+			WheelTimer.this.started.countDown();
 			
 			while (WORKER_STATE_UPDATER.get(WheelTimer.this) == WORKER_STATE_STARTED) {
 				
