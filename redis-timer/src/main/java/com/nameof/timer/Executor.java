@@ -25,6 +25,9 @@ public class Executor extends Thread{
 				queue.take().run();
 			} catch (InterruptedException e) {
 				return;
+			} catch (Throwable e) {
+				// TODO logger
+				System.out.println(e);
 			}
 		}
 	}

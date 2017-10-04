@@ -18,6 +18,9 @@ public abstract class AbstractTimer {
 	        AtomicIntegerFieldUpdater.newUpdater(AbstractTimer.class, "workerState");
 	
 	public void addTask(Task job, int delay, TimeUnit unit) {
+		if (delay < 0) {
+			throw new IllegalArgumentException("delay must be >= 0");
+		}
 		start();
 		doAddTask(job, delay, unit);
 	}

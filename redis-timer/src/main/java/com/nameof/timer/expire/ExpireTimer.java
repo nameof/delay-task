@@ -48,7 +48,12 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener{
 	@Override
 	public void process(String taskId) {
 		Task task = tasks.remove(taskId);
-		task.run();
+		try {
+			task.run();
+		} catch (Throwable e) {
+			// TODO: logger
+			System.out.println(e);
+		}
 	}
 	
 	private class Subscriber extends Thread {
