@@ -48,11 +48,16 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener{
 	@Override
 	public void process(String taskId) {
 		Task task = tasks.remove(taskId);
-		try {
-			task.run();
-		} catch (Throwable e) {
-			// TODO: logger
-			System.out.println(e);
+		if (task != null) {
+			try {
+				task.run();
+			} catch (Throwable e) {
+				try {
+					task.getExceptionHandler().handle(task, e);
+				} catch (Throwable e1) {
+					logger.error("exception from exceptionhandler", e1);
+				}
+			}
 		}
 	}
 	
@@ -63,7 +68,7 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener{
 		@Override
 		public void run() {
             JedisUtil.getJedis().subscribe(jps, "__keyevent@0__:expired");
-            System.out.println("exit");
+            logger.debug("subscriber exit");
             JedisUtil.returnResource();
 		}
 		

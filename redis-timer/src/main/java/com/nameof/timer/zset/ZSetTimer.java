@@ -114,8 +114,7 @@ public class ZSetTimer extends AbstractTimer {
 					}
 					
 					for (Task t : list) {
-						if (t != null)
-							executor.execute(t);
+						executor.execute(t);
 					}
 					
 					//TODO 任务执行成功，事务性细粒度删除，做到任务HA

@@ -5,7 +5,13 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public abstract class AbstractTimer {
+	
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
+	
 	/** 任务状态 */
 	public static final int WORKER_STATE_INIT = 0;
 	public static final int WORKER_STATE_STARTED = 1;
@@ -18,6 +24,12 @@ public abstract class AbstractTimer {
 	        AtomicIntegerFieldUpdater.newUpdater(AbstractTimer.class, "workerState");
 	
 	public void addTask(Task job, int delay, TimeUnit unit) {
+		if (job == null) {
+            throw new NullPointerException("job");
+        }
+        if (unit == null) {
+            throw new NullPointerException("unit");
+        }
 		if (delay < 0) {
 			throw new IllegalArgumentException("delay must be >= 0");
 		}

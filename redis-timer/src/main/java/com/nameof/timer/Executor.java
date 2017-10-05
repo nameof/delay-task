@@ -5,14 +5,21 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class Executor extends Thread{
+	
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
 	
 	private BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
 
 	public void execute(Task task) {
 		try {
-			queue.put(task);
+			if (task != null) {
+				queue.put(task);
+			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -21,13 +28,20 @@ public class Executor extends Thread{
 	@Override
 	public void run() {
 		while (!isInterrupted()) {
+			
+			Task task = null;
 			try {
-				queue.take().run();
-			} catch (InterruptedException e) {
-				return;
+				task = queue.take();
+			} catch (InterruptedException e) {return;}
+			
+			try {
+				task.run();
 			} catch (Throwable e) {
-				// TODO logger
-				System.out.println(e);
+				try {
+					task.getExceptionHandler().handle(task, e);
+				} catch (Throwable e1) {
+					logger.error("exception from exceptionhandler", e1);
+				}
 			}
 		}
 	}
