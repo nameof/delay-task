@@ -60,6 +60,12 @@ public class WheelTimer {
 	}
 	
 	public void addTask(Runnable job, long delay, TimeUnit unit) {
+		if (job == null) {
+            throw new NullPointerException("job");
+        }
+        if (unit == null) {
+            throw new NullPointerException("unit");
+        }
 		if (delay < 0) {
 			throw new IllegalArgumentException("delay must be >= 0");
 		}
@@ -135,9 +141,7 @@ public class WheelTimer {
                 
                 int idx = (int) (current % wheel.length);
                 Solt solt = wheel[idx];
-                if (solt != null) {
-                	solt.executeTask(executor);
-                }
+                solt.executeTask(executor);
                 
                 waitForNextStep();
                 

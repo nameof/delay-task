@@ -32,12 +32,16 @@ public class Executor extends Thread{
 	public void run() {
 		boolean interrupted = false;
 		while (!isInterrupted()) {
+			Task task = null;
 			try {
-				queue.take().run();
+				task = queue.take();
 			} catch (InterruptedException e) {
 				interrupted = true;
 				break;
 			}
+			try {
+				task.run();
+			} catch (Throwable e) {}
 		}
 		
 		unProcessedTasks.addAll(queue);
