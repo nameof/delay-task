@@ -57,10 +57,7 @@ public class ZSetTimer extends AbstractTimer {
         }
 	}
 
-	private static byte [] serialize(Object obj) {
-    	if (obj == null) {
-    		return null;
-    	}
+	private byte [] serialize(Object obj) {
         ObjectOutputStream obi=null;
         ByteArrayOutputStream bai=null;
         try {
@@ -71,15 +68,11 @@ public class ZSetTimer extends AbstractTimer {
             return byt;
         }
         catch (Exception e) {
-        	e.printStackTrace();
+        	throw new RuntimeException("serialize error", e);
         }
-        return null;
     }
     
-    private static Object deserizlize(byte[] byt) {
-    	if (byt == null) {
-    		return null;
-    	}
+    private Object deserizlize(byte[] byt) {
         ObjectInputStream oii=null;
         ByteArrayInputStream bis=null;
         bis=new ByteArrayInputStream(byt);
@@ -89,7 +82,7 @@ public class ZSetTimer extends AbstractTimer {
             return obj;
         }
         catch (Exception e) {
-        	e.printStackTrace();
+        	logger.error("deserialize error", e);
 		}
         return null;
     }
