@@ -6,18 +6,26 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.Transaction;
 
 import com.nameof.jedis.JedisUtil;
 import com.nameof.timer.AbstractTimer;
 import com.nameof.timer.Executor;
 import com.nameof.timer.Task;
-
+/**
+ * 使用redis的排序集合实现的延时任务，集合元素的值为任务，分数为任务的过期unix时间戳.
+ * 所以{@link ZSetTimer}要做的就是每次以当前时间戳去轮询redis，取出分数小于当前时间戳的集合元素，执行任务.
+ * 定时精度取决于轮询的时间间隔，当然我们也会因为CAP原则在频繁轮询中做出权衡.
+ * @author chengpan
+ */
 public class ZSetTimer extends AbstractTimer {
 	
 	private byte[] queueName = "delay_task_queue".getBytes();
@@ -98,20 +106,11 @@ public class ZSetTimer extends AbstractTimer {
 			executor.start();
 			
 			while (WORKER_STATE_UPDATER.get(ZSetTimer.this) == WORKER_STATE_STARTED) {
-				double current = System.currentTimeMillis();
-				Set<byte[]> set = JedisUtil.getJedis().zrangeByScore(queueName, 0, current);
-				if (set != null) {
-					List<Task> list = new ArrayList<>(set.size());
-					for (byte[] b : set) {
-						list.add((Task) deserizlize(b));
-					}
-					
-					for (Task t : list) {
-						executor.execute(t);
-					}
-					
-					//TODO 任务执行成功，事务性细粒度删除，做到任务HA
-					JedisUtil.getJedis().zremrangeByScore(queueName, 0, current);
+				
+			    List<Task> tasks = takeExpireTask();
+			    
+				for (Task t : tasks) {
+					executor.execute(t);
 				}
 				
 				try {
@@ -131,6 +130,29 @@ public class ZSetTimer extends AbstractTimer {
 				Thread.currentThread().interrupt();
 			}
 		}
+    	
+    	/**
+    	 * 使用redis的multi队列进行检测过期任务，删除过期任务2个动作的执行，避免并发情况下同一个时间点的刚被提交的任务还未执行就被删除
+    	 * 此处无需watch，因为redis队列保证执行操作不会被其他客户端提交的命令阻断，所以除非自身的程序逻辑需要watch这样的"伪回滚"
+    	 * @return 探测到的到期任务
+    	 */
+    	private List<Task> takeExpireTask() {
+    	    double current = System.currentTimeMillis();
+            Transaction tx = JedisUtil.getJedis().multi();
+            Response<Set<byte[]>> response = tx.zrangeByScore(queueName, 0, current);
+            tx.zremrangeByScore(queueName, 0, current);
+            tx.exec();
+            
+            Set<byte[]> set = response.get();
+            if (set == null)
+                return Collections.emptyList();
+            
+            List<Task> list = new ArrayList<>(set.size());
+            for (byte[] b : set) {
+                list.add((Task) deserizlize(b));
+            }
+            return list;
+    	}
     	
 		private boolean terminateExecutor() {
 			boolean interrupted = false;

@@ -5,7 +5,11 @@ import java.util.HashSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-
+/**
+ * 单独的任务执行器
+ * @author chengpan
+ *
+ */
 public class Executor extends Thread{
 	
 	private BlockingQueue<Task> queue = new LinkedBlockingQueue<>();

@@ -8,6 +8,12 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 提供任务的接口，不做赘述。
+ * 任务状态机制，参考netty的时间轮实现:
+ * https://github.com/netty/netty/blob/4.1/common/src/main/java/io/netty/util/HashedWheelTimer.java
+ * @author chengpan
+ */
 public abstract class AbstractTimer {
 	
 	protected final Logger logger = LoggerFactory.getLogger(getClass());

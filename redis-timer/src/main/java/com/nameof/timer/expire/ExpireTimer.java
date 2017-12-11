@@ -13,6 +13,11 @@ import com.nameof.jedis.JedisUtil;
 import com.nameof.timer.AbstractTimer;
 import com.nameof.timer.Task;
 
+/**
+ * 基于redis过期时间实现的定时任务，通过注册__keyevent@0__:expired事件，来执行对应计时的任务.
+ * 精度取决于redis的过期和通知机制，从 Redis 2.6 起，过期时间误差缩小到0-1毫秒.
+ * @author chengpan
+ */
 public class ExpireTimer extends AbstractTimer implements TaskExpireListener{
 	
 	public static final String TASK_PREFIX = "delay:task:";
@@ -64,16 +69,18 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener{
 	private class Subscriber extends Thread {
 
 		private JedisPubSub jps = new RedisMsgPubSubListener(ExpireTimer.this);
+
+		private static final String EXPIRE_EVENT_NAME = "__keyevent@0__:expired";
 		
 		@Override
 		public void run() {
-            JedisUtil.getJedis().subscribe(jps, "__keyevent@0__:expired");
+			JedisUtil.getJedis().subscribe(jps, EXPIRE_EVENT_NAME);
             logger.debug("subscriber exit");
             JedisUtil.returnResource();
 		}
 		
 		public void exit() {
-			jps.unsubscribe("__keyevent@0__:expired");
+			jps.unsubscribe(EXPIRE_EVENT_NAME);
 		}
 		
 	}

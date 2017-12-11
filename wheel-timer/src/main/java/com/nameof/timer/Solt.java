@@ -5,6 +5,11 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+/**
+ * 任务槽
+ * @author chengpan
+ *
+ */
 public class Solt {
 	
 	/** 任务链 */

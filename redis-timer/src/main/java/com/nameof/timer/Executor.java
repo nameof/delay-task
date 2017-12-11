@@ -8,7 +8,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * 单独的任务执行器
+ * @author chengpan
+ *
+ */
 public class Executor extends Thread{
 	
 	protected final Logger logger = LoggerFactory.getLogger(getClass());
@@ -21,7 +25,7 @@ public class Executor extends Thread{
 				queue.put(task);
 			}
 		} catch (InterruptedException e) {
-			e.printStackTrace();
+		    logger.error("阻塞队列put中断异常", e);
 		}
 	}
 	
