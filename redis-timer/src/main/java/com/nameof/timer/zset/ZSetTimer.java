@@ -18,12 +18,14 @@ import redis.clients.jedis.Transaction;
 
 import com.nameof.jedis.JedisUtil;
 import com.nameof.timer.AbstractTimer;
+import com.nameof.timer.ExceptionHandler;
 import com.nameof.timer.Executor;
 import com.nameof.timer.Task;
 /**
  * 使用redis的排序集合实现的延时任务，集合元素的值为任务，分数为任务的过期unix时间戳.
  * 所以{@link ZSetTimer}要做的就是每次以当前时间戳去轮询redis，取出分数小于当前时间戳的集合元素，执行任务.
  * 定时精度取决于轮询的时间间隔，当然我们也会因为CAP原则在频繁轮询中做出权衡.
+ * 由于任务自身有{@link ExceptionHandler}，所以客户端可自定义实现任务失败后重发到redis等这样逻辑的Handler
  * @author chengpan
  */
 public class ZSetTimer extends AbstractTimer {
@@ -132,8 +134,10 @@ public class ZSetTimer extends AbstractTimer {
 		}
     	
     	/**
-    	 * 使用redis的multi队列进行检测过期任务，删除过期任务2个动作的执行，避免并发情况下同一个时间点的刚被提交的任务还未执行就被删除
-    	 * 此处无需watch，因为redis队列保证执行操作不会被其他客户端提交的命令阻断，所以除非自身的程序逻辑需要watch这样的"伪回滚"
+    	 * 使用redis的multi队列进行检测过期任务，删除过期任务2个动作的执行，避免并发情况下同一个时间点的刚被提交的任务还未执行就被删除。<br/>
+    	 * 此处无需watch，因为redis队列保证执行操作不会被其他客户端提交的命令阻断。<br/>
+    	 * 即使timer在向redis发送这两条命令的间隔中,任务队列被其它客户端修改，修改无非就有提交了过期任务，或未过期任务这两种情况。前者
+    	 * 会在exec时正好被拿出来执行，后者尚未到执行时刻，所以均对程序无影响，所以除非自身的程序需要互斥写redis队列，才需要watch这样的"伪回滚"。
     	 * @return 探测到的到期任务
     	 */
     	private List<Task> takeExpireTask() {
