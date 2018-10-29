@@ -34,13 +34,11 @@ public class Executor extends Thread{
 	
 	@Override
 	public void run() {
-		boolean interrupted = false;
 		while (!isInterrupted()) {
 			Task task = null;
 			try {
 				task = queue.take();
 			} catch (InterruptedException e) {
-				interrupted = true;
 				break;
 			}
 			try {
@@ -49,9 +47,5 @@ public class Executor extends Thread{
 		}
 		
 		unProcessedTasks.addAll(queue);
-		
-		if (interrupted) {
-			Thread.currentThread().interrupt();
-		}
 	}
 }

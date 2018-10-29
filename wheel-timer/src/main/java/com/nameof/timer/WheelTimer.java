@@ -45,7 +45,7 @@ public class WheelTimer {
 	/**
 	 *  用于{@link #start()}方法等待工作线程初始化完成，方可完成任务的添加
 	 *  否则可能造成并发开启时间轮和添加任务时，工作线程尚未进入执行轮询时间轮，导致那一时刻并发添加的任务延时不准确
-	 *  但在一般情况下，工作线程初始化不存在耗时操作，基本瞬间完成，可以认为此处是臃肿的设计
+	 *  但在一般情况下，工作线程初始化不存在耗时操作
 	 */
 	private CountDownLatch started = new CountDownLatch(1);
 	
@@ -114,12 +114,16 @@ public class WheelTimer {
 	/** 等待工作线程结束，以便完成未执行Task的转移 */
 	private void waitForWorkerTerminate() {
 		
+		boolean clientInterrupted = false;
         while (workerThread.isAlive()) {
         	workerThread.interrupt();
             try {
             	workerThread.join(100);
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+            	clientInterrupted = true;
+            }
         }
+        if (clientInterrupted) Thread.currentThread().interrupt();
 	}
 
 	/** 时间轮执行器，轮询时间轮和任务，调度执行 */
@@ -185,21 +189,14 @@ public class WheelTimer {
 		/** 终止任务的执行，并收集未执行的Task，返回到{@link WheelTimer#tasks}中 */
 		private void terminateExecutor() {
 
-			boolean interrupted = false;
             while (executor.isAlive()) {
             	executor.interrupt();
                 try {
                 	executor.join(100);
-                } catch (InterruptedException ignored) {
-                    interrupted = true;
-                }
+                } catch (InterruptedException ignored) {}
             }
 
             collectUnprocessedTasks();
-            
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
 		}
 		
 		/** 收集时间轮各个槽、Executor线程尚未执行Task */
