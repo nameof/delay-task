@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
  * @author chengpan
  *
  */
-public class Executor extends Thread{
+public class Executor extends Thread {
 	
 	protected final Logger logger = LoggerFactory.getLogger(getClass());
 	

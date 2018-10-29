@@ -58,13 +58,16 @@ public class ZSetTimer extends AbstractTimer {
 	
 	/** 等待工作线程结束，以便完成未执行Task的转移 */
 	private void waitForWorkerTerminate() {
-		
+		boolean clientInterrupted = false;
         while (workerThread.isAlive()) {
         	workerThread.interrupt();
             try {
             	workerThread.join(100);
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+            	clientInterrupted = true;
+            }
         }
+        if (clientInterrupted) Thread.currentThread().interrupt();
 	}
 
 	private byte [] serialize(Object obj) {
@@ -104,7 +107,6 @@ public class ZSetTimer extends AbstractTimer {
     	@Override
 		public void run() {
 
-    		boolean interrupted = false;
 			executor.start();
 			
 			while (WORKER_STATE_UPDATER.get(ZSetTimer.this) == WORKER_STATE_STARTED) {
@@ -117,20 +119,14 @@ public class ZSetTimer extends AbstractTimer {
 				
 				try {
 					TimeUnit.MILLISECONDS.sleep(100);
-				} catch (InterruptedException e) {
-					interrupted = true;
-				}
+				} catch (InterruptedException e) { }
 			}
 			
 			JedisUtil.returnResource();
 			
-			interrupted = terminateExecutor() || interrupted;
+			terminateExecutor();
 			
 			unprocessedTasks.addAll(executor.getUnprocessedTasks());
-			
-			if (interrupted) {
-				Thread.currentThread().interrupt();
-			}
 		}
     	
     	/**
@@ -158,17 +154,13 @@ public class ZSetTimer extends AbstractTimer {
             return list;
     	}
     	
-		private boolean terminateExecutor() {
-			boolean interrupted = false;
+		private void terminateExecutor() {
             while (executor.isAlive()) {
             	executor.interrupt();
                 try {
                 	executor.join(100);
-                } catch (InterruptedException ignored) {
-                    interrupted = true;
-                }
+                } catch (InterruptedException ignored) { }
             }
-            return interrupted;
 		}
     }
 }

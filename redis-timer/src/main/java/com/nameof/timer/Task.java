@@ -3,7 +3,7 @@ package com.nameof.timer;
 import java.io.Serializable;
 import java.util.UUID;
 
-abstract public class Task implements Serializable{
+abstract public class Task implements Serializable {
 
 	private static final long serialVersionUID = -8639671839184198860L;
 
