@@ -7,45 +7,46 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * 单独的任务执行器
- * @author chengpan
  *
+ * @author chengpan
  */
-public class Executor extends Thread{
-	
-	private BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
+public class Executor extends Thread {
 
-	private Collection<Task> unProcessedTasks = new HashSet<>();
-	
-	public Collection<Task> getUnProcessedTasks() {
-		return unProcessedTasks;
-	}
+    private BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
 
-	public void setUnProcessedTasks(Collection<Task> unProcessedTasks) {
-		this.unProcessedTasks = unProcessedTasks;
-	}
+    private Collection<Task> unProcessedTasks = new HashSet<>();
 
-	public void execute(Task task) {
-		try {
-			queue.put(task);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	@Override
-	public void run() {
-		while (!isInterrupted()) {
-			Task task = null;
-			try {
-				task = queue.take();
-			} catch (InterruptedException e) {
-				break;
-			}
-			try {
-				task.run();
-			} catch (Throwable e) {}
-		}
-		
-		unProcessedTasks.addAll(queue);
-	}
+    public Collection<Task> getUnProcessedTasks() {
+        return unProcessedTasks;
+    }
+
+    public void setUnProcessedTasks(Collection<Task> unProcessedTasks) {
+        this.unProcessedTasks = unProcessedTasks;
+    }
+
+    public void execute(Task task) {
+        try {
+            queue.put(task);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        while (!isInterrupted()) {
+            Task task = null;
+            try {
+                task = queue.take();
+            } catch (InterruptedException e) {
+                break;
+            }
+            try {
+                task.run();
+            } catch (Throwable e) {
+            }
+        }
+
+        unProcessedTasks.addAll(queue);
+    }
 }

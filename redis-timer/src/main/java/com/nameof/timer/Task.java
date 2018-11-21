@@ -5,61 +5,61 @@ import java.util.UUID;
 
 abstract public class Task implements Serializable {
 
-	private static final long serialVersionUID = -8639671839184198860L;
+    private static final long serialVersionUID = -8639671839184198860L;
 
-	private String id;
-	
-	private long deadline;
-	
-	private ExceptionHandler handler;
-	
-	private static final ExceptionHandler defaultHandler = new ExceptionHandler() {
-		
-		private static final long serialVersionUID = 1L;
+    private String id;
 
-		@Override
-		public void handle(Task task, Throwable e) {
-			e.printStackTrace();
-		}
-	};
-	
-	public Task() {
-		this(UUID.randomUUID().toString());
-	}
-	
-	public Task(String id) {
-		this(id, defaultHandler);
-	}
-	
-	public Task(String id, ExceptionHandler handler) {
-		this(id, -1, handler);
-	}
-	
-	public Task(String id, long deadline, ExceptionHandler handler) {
-		this.id = id;
-		this.deadline = deadline;
-		this.handler = handler;
-	}
+    private long deadline;
 
-	public abstract void run();
-	
-	public void setExceptionHandler(ExceptionHandler handler) {
-		this.handler = handler;
-	}
+    private ExceptionHandler handler;
 
-	public ExceptionHandler getExceptionHandler() {
-		return handler;
-	}
+    private static final ExceptionHandler defaultHandler = new ExceptionHandler() {
 
-	public void setDeadline(long deadline) {
-		this.deadline = deadline;
-	}
+        private static final long serialVersionUID = 1L;
 
-	public long getDeadline() {
-		return deadline;
-	}
+        @Override
+        public void handle(Task task, Throwable e) {
+            e.printStackTrace();
+        }
+    };
 
-	public String getId() {
-		return id;
-	}
+    public Task() {
+        this(UUID.randomUUID().toString());
+    }
+
+    public Task(String id) {
+        this(id, defaultHandler);
+    }
+
+    public Task(String id, ExceptionHandler handler) {
+        this(id, -1, handler);
+    }
+
+    public Task(String id, long deadline, ExceptionHandler handler) {
+        this.id = id;
+        this.deadline = deadline;
+        this.handler = handler;
+    }
+
+    public abstract void run();
+
+    public void setExceptionHandler(ExceptionHandler handler) {
+        this.handler = handler;
+    }
+
+    public ExceptionHandler getExceptionHandler() {
+        return handler;
+    }
+
+    public void setDeadline(long deadline) {
+        this.deadline = deadline;
+    }
+
+    public long getDeadline() {
+        return deadline;
+    }
+
+    public String getId() {
+        return id;
+    }
 }
