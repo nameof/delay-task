@@ -45,10 +45,10 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener {
 
 
     /**
-     * 停止并返回尚未被处理的任务
+     * @return 返回尚未被处理的任务
      */
     protected Collection<Task> onStop() {
-        jedis.close();//释放资源
+        jedis.close();
         subThread.exit();
         return Collections.unmodifiableCollection(tasks.values());
     }
@@ -60,12 +60,16 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener {
             try {
                 task.run();
             } catch (Throwable e) {
-                try {
-                    task.getExceptionHandler().handle(task, e);
-                } catch (Throwable e1) {
-                    logger.error("exception from exceptionhandler", e1);
-                }
+                taskError(task, e);
             }
+        }
+    }
+
+    private void taskError(Task task, Throwable e) {
+        try {
+            task.getExceptionHandler().handle(task, e);
+        } catch (Throwable e1) {
+            logger.error("exception from exceptionhandler", e1);
         }
     }
 
@@ -78,8 +82,8 @@ public class ExpireTimer extends AbstractTimer implements TaskExpireListener {
         @Override
         public void run() {
             JedisUtil.getJedis().subscribe(jps, EXPIRE_EVENT_NAME);
-            logger.debug("subscriber exit");
             JedisUtil.returnResource();
+            logger.debug("subscriber exit");
         }
 
         public void exit() {

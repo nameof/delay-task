@@ -1,26 +1,17 @@
 package com.nameof.timer.zset;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.Response;
-import redis.clients.jedis.Transaction;
-
 import com.nameof.jedis.JedisUtil;
+import com.nameof.jedis.SerializeUtils;
 import com.nameof.timer.AbstractTimer;
 import com.nameof.timer.ExceptionHandler;
 import com.nameof.timer.Executor;
 import com.nameof.timer.Task;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.Transaction;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 使用redis的排序集合实现的延时任务，集合元素的值为任务，分数为任务的过期unix时间戳.
@@ -43,7 +34,7 @@ public class ZSetTimer extends AbstractTimer {
     public void doAddTask(Task job, int delay, TimeUnit unit) {
         long score = System.currentTimeMillis() + unit.toMillis(delay);
         job.setDeadline(score);
-        jedis.zadd(queueName, score, serialize(job));
+        jedis.zadd(queueName, score, SerializeUtils.serialize(job));
     }
 
     protected void onStart() {
@@ -52,16 +43,17 @@ public class ZSetTimer extends AbstractTimer {
     }
 
     /**
-     * 停止时间轮，并返回本地尚未被执行的任务，不包含redis中剩余的任务
+     * 停止时间轮
+     * @return 返回本地尚未被执行的任务，不包含redis中尚未被执行的任务
      */
     public Collection<Task> onStop() {
-        jedis.close();//释放资源
+        jedis.close();
         waitForWorkerTerminate();
         return unprocessedTasks;
     }
 
     /**
-     * 等待工作线程结束，以便完成未执行Task的转移
+     * 等待工作线程结束
      */
     private void waitForWorkerTerminate() {
         boolean clientInterrupted = false;
@@ -76,34 +68,6 @@ public class ZSetTimer extends AbstractTimer {
         if (clientInterrupted) Thread.currentThread().interrupt();
     }
 
-    private byte[] serialize(Object obj) {
-        ObjectOutputStream obi = null;
-        ByteArrayOutputStream bai = null;
-        try {
-            bai = new ByteArrayOutputStream();
-            obi = new ObjectOutputStream(bai);
-            obi.writeObject(obj);
-            byte[] byt = bai.toByteArray();
-            return byt;
-        } catch (Exception e) {
-            throw new RuntimeException("serialize error", e);
-        }
-    }
-
-    private Object deserizlize(byte[] byt) {
-        ObjectInputStream oii = null;
-        ByteArrayInputStream bis = null;
-        bis = new ByteArrayInputStream(byt);
-        try {
-            oii = new ObjectInputStream(bis);
-            Object obj = oii.readObject();
-            return obj;
-        } catch (Exception e) {
-            logger.error("deserialize error", e);
-        }
-        return null;
-    }
-
     private class Worker implements Runnable {
 
         private Executor executor = new Executor();
@@ -116,22 +80,34 @@ public class ZSetTimer extends AbstractTimer {
             while (WORKER_STATE_UPDATER.get(ZSetTimer.this) == WORKER_STATE_STARTED) {
 
                 List<Task> tasks = takeExpireTask();
-
-                for (Task t : tasks) {
-                    executor.execute(t);
-                }
+                tasks.forEach(executor::execute);
 
                 try {
                     TimeUnit.MILLISECONDS.sleep(100);
-                } catch (InterruptedException e) {
-                }
+                } catch (InterruptedException ignore) { }
             }
+            workerExit();
+        }
 
+        private void workerExit() {
             JedisUtil.returnResource();
 
             terminateExecutor();
 
             unprocessedTasks.addAll(executor.getUnprocessedTasks());
+        }
+
+        private List<Task> takeExpireTask() {
+            Set<byte[]> set = getExpiredTaskData();
+            return serializeToTask(set);
+        }
+
+        private List<Task> serializeToTask(Set<byte[]> set) {
+            if (set == null)
+                return Collections.emptyList();
+            List<Task> list = new ArrayList<>(set.size());
+            set.forEach((b) -> list.add((Task) SerializeUtils.deserizlize(b)));
+            return list;
         }
 
         /**
@@ -142,22 +118,13 @@ public class ZSetTimer extends AbstractTimer {
          *
          * @return 探测到的到期任务
          */
-        private List<Task> takeExpireTask() {
-            double current = System.currentTimeMillis();
+        private Set<byte[]> getExpiredTaskData() {
+            long current = System.currentTimeMillis();
             Transaction tx = JedisUtil.getJedis().multi();
             Response<Set<byte[]>> response = tx.zrangeByScore(queueName, 0, current);
             tx.zremrangeByScore(queueName, 0, current);
             tx.exec();
-
-            Set<byte[]> set = response.get();
-            if (set == null)
-                return Collections.emptyList();
-
-            List<Task> list = new ArrayList<>(set.size());
-            for (byte[] b : set) {
-                list.add((Task) deserizlize(b));
-            }
-            return list;
+            return response.get();
         }
 
         private void terminateExecutor() {
@@ -165,8 +132,7 @@ public class ZSetTimer extends AbstractTimer {
                 executor.interrupt();
                 try {
                     executor.join(100);
-                } catch (InterruptedException ignored) {
-                }
+                } catch (InterruptedException ignored) { }
             }
         }
     }

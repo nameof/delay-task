@@ -67,7 +67,8 @@ public abstract class AbstractTimer {
     protected abstract void onStart();
 
     /**
-     * 停止并返回尚未被处理的任务
+     * 停止
+     * @return 返回尚未被处理的任务
      */
     public Collection<Task> stop() {
         if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {
