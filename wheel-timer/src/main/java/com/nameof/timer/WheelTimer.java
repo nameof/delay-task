@@ -53,16 +53,8 @@ public class WheelTimer {
     private static final AtomicIntegerFieldUpdater<WheelTimer> WORKER_STATE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(WheelTimer.class, "workerState");
 
-    /**
-     * 用于{@link #start()}方法等待工作线程初始化完成，方可完成任务的添加
-     * 否则可能造成并发开启时间轮和添加任务时，工作线程尚未进入执行轮询时间轮，导致那一时刻并发添加的任务延时不准确
-     * 但在一般情况下，工作线程初始化不存在耗时操作
-     */
     private CountDownLatch started = new CountDownLatch(1);
 
-    /**
-     * 工作线程是否已开启
-     */
     private volatile boolean workerStarted = false;
 
     public WheelTimer() {
@@ -106,7 +98,13 @@ public class WheelTimer {
             default:
                 throw new Error("Invalid WorkerState");
         }
-        //等待时间轮初始化完成
+        waitUntilStarted();
+    }
+
+    /**
+     * 等待时间轮初始化完成
+     */
+    private void waitUntilStarted() {
         while (!workerStarted) {
             try {
                 started.await();
@@ -116,9 +114,8 @@ public class WheelTimer {
     }
 
     /**
-     * 停止时间轮，返回尚未执行的Task
-     *
-     * @return
+     * 停止时间轮
+     * @return 返回尚未执行的Task
      */
     public Collection<Task> stop() {
         if (WORKER_STATE_UPDATER.compareAndSet(this, WORKER_STATE_STARTED, WORKER_STATE_SHUTDOWN)) {
@@ -129,7 +126,7 @@ public class WheelTimer {
     }
 
     /**
-     * 等待工作线程结束，以便完成未执行Task的转移
+     * 等待工作线程结束
      */
     private void waitForWorkerTerminate() {
 
@@ -157,19 +154,13 @@ public class WheelTimer {
         @Override
         public void run() {
 
-            executor.start();
-
-            WheelTimer.this.workerStarted = true;
-
-            WheelTimer.this.started.countDown();
+            startup();
 
             while (WORKER_STATE_UPDATER.get(WheelTimer.this) == WORKER_STATE_STARTED) {
 
                 transferTasks();
 
-                int idx = (int) (current % wheel.length);
-                Solt solt = wheel[idx];
-                solt.executeTask(executor);
+                checkSolt();
 
                 waitForNextStep();
 
@@ -179,12 +170,10 @@ public class WheelTimer {
             terminateExecutor();
         }
 
-        private void waitForNextStep() {
-            try {
-                Thread.sleep(duration);
-            } catch (InterruptedException e) {
-                return;
-            }
+        private void startup() {
+            executor.start();
+            WheelTimer.this.workerStarted = true;
+            WheelTimer.this.started.countDown();
         }
 
         /**
@@ -195,7 +184,6 @@ public class WheelTimer {
             for (int i = 0; i < 10000; i++) {
                 Task task = tasks.poll();
                 if (task == null) {
-                    //处理完成
                     break;
                 }
 
@@ -204,6 +192,20 @@ public class WheelTimer {
                 task.setRound(round);
 
                 wheel[stopIndex].addTask(task);
+            }
+        }
+
+        private void checkSolt() {
+            int idx = (int) (current % wheel.length);
+            Solt solt = wheel[idx];
+            solt.executeTask(executor);
+        }
+
+        private void waitForNextStep() {
+            try {
+                Thread.sleep(duration);
+            } catch (InterruptedException e) {
+                return;
             }
         }
 

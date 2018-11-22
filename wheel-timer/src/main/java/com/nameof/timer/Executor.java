@@ -20,10 +20,6 @@ public class Executor extends Thread {
         return unProcessedTasks;
     }
 
-    public void setUnProcessedTasks(Collection<Task> unProcessedTasks) {
-        this.unProcessedTasks = unProcessedTasks;
-    }
-
     public void execute(Task task) {
         try {
             queue.put(task);
