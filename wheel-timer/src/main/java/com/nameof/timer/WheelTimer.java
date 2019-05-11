@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 /**
  * 对于新添加的任务{@link WheelTimer}首先将其缓存到自身的{@link #tasks}中
  * {@link #workerThread}会在下一次的指针移动时，将缓存的任务放置到对应的时间轮槽中
- * 所以，时间轮任务执行时间的精度会受到指针移动的时间间隔影响，并且适用于延时精度不高的场景，例如秒级别的延时
+ * 所以，时间轮任务执行时间的精度会受到指针移动的时间间隔影响，适用于秒级别的延时
  *
  * <p>任务状态机制，参考netty的时间轮实现:
  * https://github.com/netty/netty/blob/4.1/common/src/main/java/io/netty/util/HashedWheelTimer.java
