@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 使用redis的排序集合实现的延时任务，集合元素的值为任务，分数为任务的过期unix时间戳.
  * 所以{@link ZSetTimer}要做的就是每次以当前时间戳去轮询redis，取出分数小于当前时间戳的集合元素，执行任务.
- * 定时精度取决于轮询的时间间隔，当然我们也会因为CAP原则在频繁轮询中做出权衡.
+ * 定时精度取决于轮询的时间间隔，这个值可以适当权衡
  * 由于任务自身有{@link ExceptionHandler}，所以客户端可自定义实现任务失败后重发到redis等这样逻辑的Handler
  *
  * @author chengpan
