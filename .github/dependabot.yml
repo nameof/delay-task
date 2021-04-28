@@ -1,0 +1,13 @@
+version: 2
+updates:
+- package-ecosystem: maven
+  directory: "/redis-timer"
+  schedule:
+    interval: daily
+    time: "21:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: redis.clients:jedis
+    versions:
+    - 3.5.1
+    - 3.5.2
